@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.Extensions.Logging;
 using SoftBeckhoff.Interfaces;
 using SoftBeckhoff.Models;
@@ -39,7 +41,8 @@ namespace SoftBeckhoff.Controllers
         }
         
         [HttpPut("/symbols/{name}")]
-        public void SetSymbol([FromRoute]string name, [FromBody]byte[] value)
+        [Consumes("application/octet-stream")]
+        public void SetSymbol([FromRoute]string name, [ModelBinder(BinderType = typeof(ByteArrayModelBinder))] byte[] value)
         {
             plcService.SetSymbol(name, value);
         }
@@ -60,6 +63,18 @@ namespace SoftBeckhoff.Controllers
         public bool AddRoutes([FromBody]RouteSetting route)
         {
             return routerService.TryAddRoute(route);
+        }
+    }
+
+    public class ByteArrayModelBinder : IModelBinder
+    {
+        public async Task BindModelAsync(ModelBindingContext bindingContext)
+        {
+            using (var ms = new MemoryStream())
+            {
+                await bindingContext.HttpContext.Request.Body.CopyToAsync(ms);
+                bindingContext.Result = ModelBindingResult.Success(ms.ToArray());
+            }
         }
     }
 }
