@@ -15,6 +15,7 @@ using SoftBeckhoff.Structs;
 using TwinCAT.Ads;
 using TwinCAT.Ads.Server;
 using TwinCAT.Ams;
+using TwinCAT.TypeSystem;
 
 namespace SoftBeckhoff.Services
 {
@@ -151,7 +152,7 @@ namespace SoftBeckhoff.Services
         
         public async Task<AdsErrorCode> OnReceivedAsync(AmsCommand frame, CancellationToken cancel)
         {
-            logger.LogDebug($"onreceive frame: {frame.Dump()}");
+            logger.LogDebug($"onreceive frame: {frame.Dump()}, commandId: {frame.Header.CommandId}");
             if (frame.Header.CommandId != AdsCommandId.ReadState)
                 logger.LogInformation($"{frame.Dump()}");
 
@@ -167,6 +168,13 @@ namespace SoftBeckhoff.Services
                 responseData.AddRange(responseHeader.GetBytes());
                 responseData.AddRange(data);
                 
+            }
+            else if (frame.Header.CommandId == AdsCommandId.ReadDeviceInfo)
+            {
+                if (this.logger != null)
+                    this.logger.LogDebug("OnReadDeviceInfoIndication(Addr:{0},IId:{1})", (object) frame.Header.Sender, (object) frame.Header.HUser);
+                AdsVersion adsVersion = new AdsVersion(1, 1, 1);
+                return await this.ReadDeviceInfoResponseAsync(frame.Header.Sender, frame.Header.HUser, AdsErrorCode.NoError, "ba_plc", adsVersion, cancel);
             }
             else if (frame.Header.CommandId == AdsCommandId.ReadState)
             {
@@ -233,6 +241,71 @@ namespace SoftBeckhoff.Services
                     new ReadOnlyMemory<byte>(responseData.ToArray())), cancel);
             
             return result;
+        }
+
+        /// <summary>Sends an ADS Read Device Info response.</summary>
+        /// <param name="target">The receiver's AMS address</param>
+        /// <param name="invokeId">The invoke ID provided by the receiver</param>
+        /// <param name="result">The ADS error code for the response</param>
+        /// <param name="name">The name of this ADS server</param>
+        /// <param name="version">The version of this ADS server</param>
+        /// <param name="cancel">The cancellation token.</param>
+        /// <returns>A task that represents the asynchronous <see cref="M:TwinCAT.Ads.Server.AdsServer.ReadDeviceInfoResponseAsync(TwinCAT.Ads.AmsAddress,System.UInt32,TwinCAT.Ads.AdsErrorCode,System.String,TwinCAT.Ads.AdsVersion,System.Threading.CancellationToken)" /> operation. The <see cref="T:System.Threading.Tasks.Task`1" /> parameter contains the <see cref="T:TwinCAT.Ads.AdsErrorCode" /> as
+        /// <see cref="P:System.Threading.Tasks.Task`1.Result" />.</returns>
+        protected Task<AdsErrorCode> ReadDeviceInfoResponseAsync(
+          AmsAddress target,
+          uint invokeId,
+          AdsErrorCode result,
+          string name,
+          AdsVersion version,
+          CancellationToken cancel)
+        {
+          if (target == (AmsAddress) null)
+            throw new ArgumentNullException(nameof (target));
+          if (version == null)
+            throw new ArgumentNullException(nameof (version));
+          if (string.IsNullOrEmpty(name))
+            throw new ArgumentOutOfRangeException(nameof (name));
+          AdsReadDeviceInfoRessponseHeader adsHeader = new AdsReadDeviceInfoRessponseHeader();
+          adsHeader._result = result;
+          adsHeader._majorVersion = version.Version;
+          adsHeader._minorVersion = version.Revision;
+          adsHeader._versionBuild = (ushort) version.Build;
+          byte[] bytes = StringMarshaler.DefaultEncoding.GetBytes(name.ToCharArray(), 0, name.Length < 16 ? name.Length : 16);
+          adsHeader._deviceName = bytes;
+          return this.SendResponseAsync(target, invokeId, AdsCommandId.ReadDeviceInfo, (ITcAdsHeader) adsHeader, (ReadOnlyMemory<byte>) Memory<byte>.Empty, cancel);
+        }
+
+        /// <summary>Send response as an asynchronous operation.</summary>
+        /// <param name="target">The r addr.</param>
+        /// <param name="invokeId">The invoke identifier.</param>
+        /// <param name="serviceId">The service identifier.</param>
+        /// <param name="adsHeader">The ads header.</param>
+        /// <param name="adsData">The ads data.</param>
+        /// <param name="cancel">The cancellation token.</param>
+        /// <returns>A task that represents the asynchronous 'SendResponse' operation. The <see cref="T:System.Threading.Tasks.Task`1" /> parameter contains the <see cref="T:TwinCAT.Ads.AdsErrorCode" /> as
+        /// <see cref="P:System.Threading.Tasks.Task`1.Result" />.
+        /// </returns>
+        private async Task<AdsErrorCode> SendResponseAsync(
+          AmsAddress target,
+          uint invokeId,
+          AdsCommandId serviceId,
+          ITcAdsHeader adsHeader,
+          ReadOnlyMemory<byte> adsData,
+          CancellationToken cancel)
+        {
+          if (cancel.IsCancellationRequested)
+            return AdsErrorCode.ClientSyncTimeOut;
+          int cbData = adsHeader.MarshalSize() + adsData.Length;
+          AmsHeader amsHeader = new AmsHeader(target, server.ServerAddress, serviceId, AmsStateFlags.MaskAdsResponse, (uint) cbData, 0U, invokeId);
+          byte[] numArray = new byte[cbData];
+          AdsHeaderMarshaller.Marshal(adsHeader, adsData.Span, numArray.AsSpan<byte>());
+          if (this.logger != null)
+            this.logger.LogDebug("Before Sending Response: {0}", (object) adsHeader.Dump());
+          AdsErrorCode adsErrorCode = await server.AmsSendAsync(new AmsCommand(amsHeader, new ReadOnlyMemory<byte>(numArray)), cancel).ConfigureAwait(false);
+          if (this.logger != null)
+            this.logger.LogDebug("After Sending Response: {0}", (object) adsHeader.Dump());
+          return adsErrorCode;
         }
 
         private void DeleteNorification(int handler)
