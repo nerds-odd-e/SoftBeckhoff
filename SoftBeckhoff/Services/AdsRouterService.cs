@@ -14,11 +14,11 @@ namespace SoftBeckhoff.Services
 {
     public class AdsRouterService : BackgroundService, IRouterService
     {
-        private readonly ILogger<TwinCAT.Ads.AdsRouterService.RouterService> logger;
+        private readonly ILogger<AdsRouterService> logger;
         private readonly IConfiguration configuration;
         private AmsTcpIpRouter amsTcpIpRouter;
 
-        public AdsRouterService(ILogger<TwinCAT.Ads.AdsRouterService.RouterService> logger, IConfiguration configuration)
+        public AdsRouterService(ILogger<AdsRouterService> logger, IConfiguration configuration)
         {
             this.logger = logger;
             this.configuration = configuration;
