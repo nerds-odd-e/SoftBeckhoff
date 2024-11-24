@@ -49,9 +49,43 @@ namespace SoftBeckhoff.Services
             disposables.Add(server);
 
             server.RegisterReceiver(this);
-            
-            AddSymbol(new AdsSymbol("test1", typeof(byte)));
-            AddSymbol(new AdsSymbol("test2", typeof(byte)));
+
+            AddSymbol(new AdsSymbol("doNotRemove", typeof(byte)));
+            AddSymbol(new AdsSymbol("PC_PLC.b_error", typeof(short))); // none 0 value 3 will fail
+            //short b_error = 3;
+            //WriteSymbol("PC_PLC.b_error", b_error.GetBytes());
+            AddSymbol(new AdsSymbol("PC_PLC.b_Error", typeof(int))); // none 0 value 42 will fail
+            int b_error = 0;
+            WriteSymbol("PC_PLC.b_Error", b_error.GetBytes());
+            AddSymbol(new AdsSymbol("PC_PLC.s_MoveVel", typeof(int)));
+            AddSymbol(new AdsSymbol("PC_PLC.s_reset", typeof(int)));
+            AddSymbol(new AdsSymbol("PC_PLC.b_AxisActPos", typeof(double)));
+            AddSymbol(new AdsSymbol("PC_PLC.b_AxisTrigValue", typeof(double)));
+            AddSymbol(new AdsSymbol("PC_PLC.b_XTemp", typeof(double)));
+            AddSymbol(new AdsSymbol("PC_PLC.b_YTemp", typeof(double)));
+            AddSymbol(new AdsSymbol("PC_PLC.b_ZTemp", typeof(double)));
+            AddSymbol(new AdsSymbol("PC_PLC.s_MeasureSetMode", typeof(int)));
+            AddSymbol(new AdsSymbol("PC_PLC.b_NewRapidLocate", typeof(double)));
+            AddSymbol(new AdsSymbol("PC_PLC.s_calibTrigvalue", typeof(int)));
+            AddSymbol(new AdsSymbol("PC_PLC.s_calibLimitvalue", typeof(int)));
+            AddSymbol(new AdsSymbol("PC_PLC.s_ProbeTouchVel", typeof(int)));
+            AddSymbol(new AdsSymbol("PC_PLC.s_BackOffRelPos", typeof(int)));
+            AddSymbol(new AdsSymbol("PC_PLC.s_triggerWaitTime", typeof(int)));
+            AddSymbol(new AdsSymbol("PC_PLC.b_Get_A_angle", typeof(double)));
+            AddSymbol(new AdsSymbol("PC_PLC.b_Get_B_angle", typeof(double)));
+            AddSymbol(new AdsSymbol("PC_PLC.s_ManualVel", typeof(int)));
+            AddSymbol(new AdsSymbol("PC_PLC.s_ClockwiseZ", typeof(int)));
+            AddSymbol(new AdsSymbol("PC_PLC.s_speed", typeof(int)));
+            AddSymbol(new AdsSymbol("PC_PLC.s_home", typeof(int)));
+            AddSymbol(new AdsSymbol("PC_PLC.s_limitvalue", typeof(int)));
+            AddSymbol(new AdsSymbol("PC_PLC.s_miu1_step2", typeof(int)));
+            AddSymbol(new AdsSymbol("PC_PLC.s_miu2_step2", typeof(int)));
+            AddSymbol(new AdsSymbol("PC_PLC.s_R_up", typeof(int)));
+            AddSymbol(new AdsSymbol("PC_PLC.s_R_down", typeof(int)));
+            AddSymbol(new AdsSymbol("PC_PLC.s_dis_thresh", typeof(int)));
+
+            AddSymbol(new AdsSymbol("PC_PLC.b_Zero_OK", typeof(bool)));
+            WriteSymbol("PC_PLC.b_Zero_OK", true.GetBytes());
         }
 
         public Dictionary<string, AdsSymbol> Symbols { get; set; } = new Dictionary<string, AdsSymbol>();
@@ -188,7 +222,9 @@ namespace SoftBeckhoff.Services
                 //Data contains Instance path encoded
                 var inputData = frame.Data.ToArray().Skip(new ReadWriteRequestData().GetSize()).ToArray();
                 var inputString = Encoding.ASCII.GetString(inputData).Trim('\0');
+                logger.LogDebug($"inputString: {inputString}");
                 var data = new byte[0];
+                //inputString != "PC_PLC.s_dis_thresh" && inputString != "PC_PLC.s_R_down" && inputString != "PC_PLC.s_R_up" && inputString != "PC_PLC.s_miu2_step2" && inputString != "PC_PLC.s_miu1_step2" && inputString != "PC_PLC.s_limitvalue" && inputString != "PC_PLC.s_home" && inputString != "PC_PLC.s_speed" && inputString != "PC_PLC.s_ClockwiseZ" && inputString != "PC_PLC.s_ManualVel" && inputString != "PC_PLC.b_Zero_OK" && inputString != "PC_PLC.b_Get_B_angle" && inputString != "PC_PLC.b_Get_A_angle" && inputString != "PC_PLC.s_triggerWaitTime" && inputString != "PC_PLC.s_BackOffRelPos" && inputString != "PC_PLC.s_ProbeTouchVel" && inputString != "PC_PLC.s_calibLimitvalue" && inputString != "PC_PLC.s_calibTrigvalue" && inputString != "PC_PLC.b_error" && inputString != "PC_PLC.s_MoveVel" && inputString != "PC_PLC.s_reset" && inputString != "PC_PLC.b_AxisActPos" && inputString != "PC_PLC.b_Error" && inputString != "PC_PLC.b_AxisTrigValue" && inputString != "PC_PLC.b_XTemp" && inputString != "PC_PLC.b_YTemp" && inputString != "PC_PLC.b_ZTemp" && inputString != "PC_PLC.s_MeasureSetMode" && inputString != "PC_PLC.b_NewRapidLocate"
                 switch (request.IndexGroup)
                 {
                     case 61449:
